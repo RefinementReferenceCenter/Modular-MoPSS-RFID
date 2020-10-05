@@ -1,9 +1,10 @@
 #include <Wire.h>
-#include <FastLED.h>
+#include <Adafruit_DotStar.h>
 
 //used for interfacing EM4095
-const uint8_t DMOD = 1; //dmod pin
-const uint8_t SHD = 3; //shutdown pin
+const uint8_t DMOD = 9; //1; //dmod pin
+const uint8_t SHD = 10; //3; //shutdown pin
+const uint8_t CLK = 5;  //RDY/CLK Pin
 const uint8_t pulseTime = 181;  //181 uS , 8688 Systick ticks
 
 volatile uint8_t headerDetect;  //count zeros (and one 1) to detect header
@@ -27,24 +28,24 @@ uint8_t last_tagbytes[10];        //contains the tag from the last time we read 
 
 uint8_t buffer[6];               //array containing a copy of the last tag that was detected, emptied once sent, without datablock and crc
 
-//Array for all pixels for FastLED
-CRGB leds[1];
-uint8_t ledset = 0;
+uint8_t ledset = 0;             //flag to toggle internal LED
+
+Adafruit_DotStar strip(1, 41, 40, DOTSTAR_BRG); //create dotstar object
 
 //##############################################################################
 //##### SETUP ##################################################################
 //##############################################################################
 void setup()
 {
+  //Set up RGB LED on board, and turn it off
+  strip.begin(); //Initialize pins for output
+  strip.show();  //Turn all LEDs off ASAP
+
   //I2C Setup
-  Wire.begin(0x09); //join I2C Bus at address 8 (0-7 is reserved)
+  Wire.begin(0x08); //join I2C Bus at address 8 (0-7 is reserved)
   Wire.onRequest(sendData); //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
-
-  //Set up RGB LED on board, and turn it off
-  FastLED.addLeds<APA102, 7, 8, BGR>(leds, 1);
-  FastLED.show();
-
+  
   //Sets the priority of the systick interrupt to 0, in order to get correct micros() readings, as they are otherwise faulty
   //due to a change in SYsTick priority for implementing I2S
   NVIC_SetPriority (SysTick_IRQn, 0);
