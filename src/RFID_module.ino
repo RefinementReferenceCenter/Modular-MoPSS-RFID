@@ -2,8 +2,8 @@
 #include <Adafruit_DotStar.h>
 
 //used for interfacing EM4095
-const uint8_t DMOD = 9; //1; //dmod pin
-const uint8_t SHD = 10; //3; //shutdown pin
+const uint8_t DMOD = 9; //dmod pin
+const uint8_t SHD = 10; //shutdown pin adjust port as well!
 const uint8_t CLK = 5;  //RDY/CLK Pin
 const uint8_t pulseTime = 181;  //181 uS , 8688 Systick ticks
 
@@ -74,7 +74,7 @@ void loop()
 {
   //shutdown: 30us until amplitude <= 1%
   //startup: 1700us until amplitude >= 99%
-
+  
   //wait until ISR reports a complete tag
   if(tagfetched == 1)
   {
@@ -297,11 +297,11 @@ void receiveEvent(int bytes_incoming)
   if(c == 1)
   {
     //attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE); //attach interrupt to watch for tag
-    REG_PORT_OUTCLR0 = PORT_PA07; //pin off, Antenna on
+    REG_PORT_OUTCLR0 = PORT_PA18; //pin off, Antenna on
   }
   else
   {
-    REG_PORT_OUTSET0 = PORT_PA07; //pin on, Antenna off
+    REG_PORT_OUTSET0 = PORT_PA18; //pin on, Antenna off
     //detachInterrupt(digitalPinToInterrupt(DMOD)); //disable interrupt if antenna is off
   }
 }
