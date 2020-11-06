@@ -1,10 +1,32 @@
+/*------------------------------------------------------------------------------
+--- Adafruit ItsyBitsy M0 pin mapping - Hardware Revision v6.5 ---
+
+ A0-
+ A1-
+ A2-
+ A3-
+ A4-
+ A5-
+
+ D2-
+ D3-
+ D4-
+ D5- ready/clock CLK
+ D7-
+ D9- demodulation DMOD
+D10- shutdown SHD
+D11-
+D12-
+D13-
+
+*///----------------------------------------------------------------------------
 #include <Wire.h>
 #include <Adafruit_DotStar.h>
 
 //used for interfacing EM4095
-const uint8_t DMOD = 9; //dmod pin
-const uint8_t SHD = 10; //shutdown pin adjust port as well!
-const uint8_t CLK = 5;  //RDY/CLK Pin
+const uint8_t DMOD = 9;         //dmod pin
+const uint8_t SHD = 10;         //shutdown pin adjust port as well!
+const uint8_t CLK = 5;          //RDY/CLK Pin
 const uint8_t pulseTime = 181;  //181 uS , 8688 Systick ticks
 
 volatile uint8_t headerDetect;  //count zeros (and one 1) to detect header
@@ -20,16 +42,15 @@ volatile uint32_t tsnap1 = 0;
 volatile uint8_t tick = 0;        //to help translate two short pulses
 volatile uint8_t tagfetched = 0;  //flag to indicate a complete tag was found
 
-uint32_t tagfetched_time0 = 0;  //time the tag was fetched
+uint32_t tagfetched_time0 = 0;    //time the tag was fetched
 uint32_t tagfetched_time1 = 0;
 
 volatile uint8_t tagbytes[10];    //array containing tag-data and crc check (not data-block)
 uint8_t last_tagbytes[10];        //contains the tag from the last time we read it
 
-uint8_t buffer[6];               //array containing a copy of the last tag that was detected, emptied once sent, without datablock and crc
+uint8_t buffer[6];                //array containing a copy of the last tag that was detected, emptied once sent, without datablock and crc
 
-uint8_t ledset = 0;             //flag to toggle internal LED
-
+uint8_t ledset = 0;                             //flag to toggle internal LED
 Adafruit_DotStar strip(1, 41, 40, DOTSTAR_BRG); //create dotstar object
 
 //##############################################################################
@@ -53,14 +74,13 @@ void setup()
   //set pins
   pinMode(DMOD,INPUT);
   pinMode(SHD,OUTPUT); //for Shutdown
-  //digitalWrite(3,LOW); //LOW = enable
   pinMode(13,OUTPUT); //for LED
 
   //only used for development
-  Serial.begin(115200);
+  //Serial.begin(115200);
   //while (!Serial); //wait until serial connection is enabled
 
-  //initialize variable for detecting the header
+  //initialize variable for detecting the tag header
   headerDetect = 0;
 
   //to start ISR, last entry of setup
@@ -78,7 +98,7 @@ void loop()
   //wait until ISR reports a complete tag
   if(tagfetched == 1)
   {
-    //REG_PORT_OUTSET0 = PORT_PA07; //pin on
+    //REG_PORT_OUTSET0 = PORT_PA07; //pin on ffor timing
     tagfetched = 0; //reset tagfetched flag
     tagfetched_time0 = millis();
 
@@ -244,9 +264,8 @@ void tag_watch()
       findstart = 1; //look for start again
 
       //perform CRC check on received data
-      //this is done at the end (as opposed to parallel) since the control bit
-      //will catch a lot of false reads and we can save the time by performing
-      //the crc only once (probably)
+      //this is done at the end (as opposed to parallel) since the control bit will catch a lot of
+      //false reads and we can save the time by performing the crc only once (probably)
       uint16_t crc = 0x0; // initialization
       uint16_t polynomial = 0x1021; // polynomial to calculate crc, actually 0x11021 but first bit is always reversed
 
