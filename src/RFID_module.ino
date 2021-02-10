@@ -26,7 +26,7 @@ D13-
 //used for interfacing EM4095
 const uint8_t DMOD = 9;         //dmod pin
 const uint8_t SHD = 10;         //shutdown pin adjust port as well!
-const uint8_t CLK = 5;          //RDY/CLK Pin
+const uint8_t CLK = 7;          //RDY/CLK Pin
 const uint8_t pulseTime = 181;  //181 uS , 8688 Systick ticks
 
 volatile uint8_t headerDetect;  //count zeros (and one 1) to detect header
