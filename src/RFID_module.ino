@@ -11,8 +11,8 @@
  D2-
  D3-
  D4-
- D5- ready/clock CLK
- D7-
+ D5-
+ D7- ready/clock CLK
  D9- demodulation DMOD
 D10- shutdown SHD
 D11-
@@ -30,7 +30,7 @@ const uint8_t CLK = 7;          //RDY/CLK Pin
 const uint8_t pulseTime = 181;  //181 uS , 8688 Systick ticks
 
 volatile uint8_t headerDetect;  //count zeros (and one 1) to detect header
-volatile uint8_t findstart = 1; //flag to toggle looking for header
+volatile uint8_t findstart = 1;  //flag to toggle looking for header
 
 volatile uint8_t bittic = 0;    //count bits from tag
 volatile uint8_t bytetic = 0;   //count bytes from tag
@@ -58,13 +58,13 @@ Adafruit_DotStar strip(1, 41, 40, DOTSTAR_BRG); //create dotstar object
 //##############################################################################
 void setup()
 {
-  //Set up RGB LED on board, and turn it off
+  //Set up RGB LED on board, and turn it off (too noisy)
   strip.begin(); //Initialize pins for output
   strip.show();  //Turn all LEDs off ASAP
 
   //I2C Setup
-  Wire.begin(0x08); //join I2C Bus at address 8 (0-7 is reserved)
-  Wire.onRequest(sendData); //what to do when being talked to
+  Wire.begin(0x08);             //join I2C Bus at address 8 (0-7 is reserved)
+  Wire.onRequest(sendData);     //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
   
   //Sets the priority of the systick interrupt to 0, in order to get correct micros() readings, as they are otherwise faulty
@@ -74,10 +74,9 @@ void setup()
   //set pins
   pinMode(DMOD,INPUT);
   pinMode(SHD,OUTPUT); //for Shutdown
-  pinMode(13,OUTPUT); //for LED
+  pinMode(13,OUTPUT);  //for LED
 
   //only used for development
-  //Serial.begin(115200);
   //while (!Serial); //wait until serial connection is enabled
 
   //initialize variable for detecting the tag header
@@ -98,7 +97,7 @@ void loop()
   //wait until ISR reports a complete tag
   if(tagfetched == 1)
   {
-    //REG_PORT_OUTSET0 = PORT_PA07; //pin on ffor timing
+    //REG_PORT_OUTSET0 = PORT_PA07; //pin on for timing
     tagfetched = 0; //reset tagfetched flag
     tagfetched_time0 = millis();
 
@@ -302,7 +301,7 @@ void sendData() //~12.6-22.6-uS
   //buffer contains last read tag id, or all 0 if no new tag since last send
   Wire.write(buffer,6);
 
-  //clear buffer after send (sends last tag it read, no matter how long ago)
+  //clear buffer after send (sends last tag is read, no matter how long ago)
   for(int i = 0;i < 6;i++)
   {
     buffer[i] = 0;
@@ -315,12 +314,10 @@ void receiveEvent(int bytes_incoming)
   byte c = Wire.read();
   if(c == 1)
   {
-    //attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE); //attach interrupt to watch for tag
     REG_PORT_OUTCLR0 = PORT_PA18; //pin off, Antenna on
   }
   else
   {
     REG_PORT_OUTSET0 = PORT_PA18; //pin on, Antenna off
-    //detachInterrupt(digitalPinToInterrupt(DMOD)); //disable interrupt if antenna is off
   }
 }
