@@ -20,6 +20,7 @@ D12-
 D13-
 
 *///----------------------------------------------------------------------------
+#include <Arduino.h>
 #include <Wire.h>
 #include <Adafruit_DotStar.h>
 
@@ -63,7 +64,7 @@ void setup()
   strip.show();  //Turn all LEDs off ASAP
 
   //I2C Setup
-  Wire.begin(0x08);             //join I2C Bus at address 8 (0-7 is reserved)
+  Wire.begin(0x09);             //join I2C Bus at address 8 (0-7 is reserved)
   Wire.onRequest(sendData);     //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
   
