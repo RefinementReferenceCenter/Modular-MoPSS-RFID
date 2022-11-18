@@ -49,29 +49,33 @@ uint8_t last_tagbytes[10];        //contains the tag from the last time we read 
 
 uint8_t buffer[6];                //array containing a copy of the last tag that was detected, emptied once sent, without datablock and crc
 
+
+
+volatile uint8_t statled = 0;
+
 //##############################################################################
 //##### SETUP ##################################################################
 //##############################################################################
 void setup(){
   //I2C Setup
-  //Wire.begin(0x08);             //join I2C Bus at address 8 (0-7 is reserved)
-  //Wire.onRequest(sendData);     //what to do when being talked to
-  //Wire.onReceive(receiveEvent); //what to do with data received
+  // Wire.begin(0x08);             //join I2C Bus at address 8 (0-7 is reserved)
+  // Wire.onRequest(sendData);     //what to do when being talked to
+  // Wire.onReceive(receiveEvent); //what to do with data received
   
   //set pins
   pinMode(DMOD,INPUT);        //demodulation input
   pinMode(CLK,INPUT);         //clock signal input
   pinMode(SHD,OUTPUT);        //shutdown
+  digitalWrite(SHD,HIGH);
   pinMode(statusLED,OUTPUT);  //status LED
   pinMode(readLED,OUTPUT);    //read LED
-
+  pinMode(2,OUTPUT);          //for timing
   //only used for development
   //while (!Serial); //wait until serial connection is enabled
 
   //initialize variable for detecting the tag header
   headerDetect = 0;
 
-  
   //measure resonant frequency
   Serial.println("Checking resonant frequency...");
   digitalWriteFast(SHD,LOW); //enable antenna
@@ -82,7 +86,8 @@ void setup(){
   Serial.print("Frequency: ");
   Serial.print(freqgrab);
   Serial.println(" Hz");
-  digitalWriteFast(SHD,HIGH); //disable antenna
+  delay(100);
+  //digitalWriteFast(SHD,HIGH); //disable antenna
 
   //to start ISR, last entry of setup
   attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE);
@@ -103,9 +108,14 @@ void loop(){
   // digitalWriteFast(SHD,HIGH);
   // digitalWrite(statusLED,LOW);
 
+  //digitalWriteFast(2,LOW);
+  if(statled == 1){
+    digitalWrite(statusLED,HIGH);
+  }
+
   //wait until ISR reports a complete tag
   if(tagfetched == 1){
-    //REG_PORT_OUTSET0 = PORT_PA07; //pin on for timing
+    //digitalWriteFast(2,HIGH); //pin on for timing
     tagfetched = 0; //reset tagfetched flag
     tagfetched_time0 = millis();
 
@@ -115,10 +125,10 @@ void loop(){
 
     //reverse bits in bytes 8.3uS
     for(int i = 0;i < 6;i++){
-      if((tagbytes[i] & 1) != ((tagbytes[i] >> 7) & 1))        tagbytes[i] ^=  0b10000001;
-      if(((tagbytes[i] >> 1) & 1) != ((tagbytes[i] >> 6) & 1)) tagbytes[i] ^=  0b01000010;
-      if(((tagbytes[i] >> 2) & 1) != ((tagbytes[i] >> 5) & 1)) tagbytes[i] ^=  0b00100100;
-      if(((tagbytes[i] >> 3) & 1) != ((tagbytes[i] >> 4) & 1)) tagbytes[i] ^=  0b00011000;
+      if((tagbytes[i] & 1) != ((tagbytes[i] >> 7) & 1))        {tagbytes[i] ^=  0b10000001;}
+      if(((tagbytes[i] >> 1) & 1) != ((tagbytes[i] >> 6) & 1)) {tagbytes[i] ^=  0b01000010;}
+      if(((tagbytes[i] >> 2) & 1) != ((tagbytes[i] >> 5) & 1)) {tagbytes[i] ^=  0b00100100;}
+      if(((tagbytes[i] >> 3) & 1) != ((tagbytes[i] >> 4) & 1)) {tagbytes[i] ^=  0b00011000;}
     }
 
     //compare current tag to last tag ~7.36uS
@@ -148,7 +158,7 @@ void loop(){
     //if time since last tag was fetched is longer than 46ms, turn off LED (means tag left read range)
     if((millis() - tagfetched_time0) > 46){
       if(ledset == 1){ //turn off LED
-        digitalWrite(13,LOW);
+        digitalWrite(readLED,LOW);
         ledset = 0;
       }
     }
@@ -160,8 +170,8 @@ void loop(){
 //must not take longer than 1ms or else millis function will start to report wrong values
 void tag_watch(){
   //**** speed test via port on/off toggle
-  //REG_PORT_OUTSET0 = PORT_PA07; //pin on ~0.25 uS pulse duration
-
+  digitalWriteFast(2,HIGH); //pin on ~0.25 uS pulse duration
+  statled = 1;
   //store time when ISR started, and the last time it started 2.18uS
   tsnap1 = tsnap0;
   tsnap0 = micros();
@@ -257,7 +267,7 @@ void tag_watch(){
       }
     }
   }
-
+  digitalWriteFast(2,LOW); //pin off for timing
 }
 
 //measure resonant frequency
@@ -282,10 +292,8 @@ void receiveEvent(int bytes_incoming){
   byte c = Wire.read();
   if(c == 1){
     digitalWriteFast(SHD,LOW);
-    //REG_PORT_OUTCLR0 = PORT_PA18; //pin off, Antenna on
   }
   else{
     digitalWriteFast(SHD,HIGH);
-    //REG_PORT_OUTSET0 = PORT_PA18; //pin on, Antenna off
   }
 }
