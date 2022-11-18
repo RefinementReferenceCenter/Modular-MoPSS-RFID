@@ -1,16 +1,18 @@
+//
+// !!! WARNING !!! AUTO-GENERATED FILE!
+// PLEASE DO NOT MODIFY IT AND USE "platformio.ini":
+// https://docs.platformio.org/page/projectconf/section_env_build.html#build-flags
+//
 {
     "configurations": [
         {
-            "name": "Linux",
+            "name": "PlatformIO",
             "includePath": [
-                "${workspaceFolder}/**",
-                "/home/birk/github/Modular-MoPSS-Door/include",
-                "/home/birk/github/Modular-MoPSS-Door/src",
-                "/home/birk/github/Modular-MoPSS-Door/.pio/libdeps/adafruit_itsybitsy_m0/TMCStepper/src",
-                "/home/birk/github/Modular-MoPSS-Door/.pio/libdeps/adafruit_itsybitsy_m0/Adafruit DotStar",
-                "/home/birk/github/Modular-MoPSS-Door/.pio/libdeps/adafruit_itsybitsy_m0/Adafruit BusIO",
+                "/home/birk/github/Modular-MoPSS-RFID/include",
+                "/home/birk/github/Modular-MoPSS-RFID/src",
+                "/home/birk/github/Modular-MoPSS-RFID/.pio/libdeps/adafruit_itsybitsy_m0/Adafruit DotStar",
+                "/home/birk/github/Modular-MoPSS-RFID/.pio/libdeps/adafruit_itsybitsy_m0/Adafruit BusIO",
                 "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/Wire",
-                "/home/birk/github/Modular-MoPSS-Door/.pio/libdeps/adafruit_itsybitsy_m0/TMC2130Stepper/src",
                 "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/SPI",
                 "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_ZeroDMA",
                 "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_ZeroDMA/utility",
@@ -27,13 +29,64 @@
                 "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/SAMD_AnalogCorrection/src",
                 "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/SDU/src",
                 "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/Servo/src",
-                "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/USBHost/src"
+                "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/USBHost/src",
+                ""
             ],
-            "defines": [],
-            "compilerPath": "/usr/bin/clang",
-            "cStandard": "c17",
-            "cppStandard": "c++14",
-            "intelliSenseMode": "linux-clang-x64"
+            "browse": {
+                "limitSymbolsToIncludedHeaders": true,
+                "path": [
+                    "/home/birk/github/Modular-MoPSS-RFID/include",
+                    "/home/birk/github/Modular-MoPSS-RFID/src",
+                    "/home/birk/github/Modular-MoPSS-RFID/.pio/libdeps/adafruit_itsybitsy_m0/Adafruit DotStar",
+                    "/home/birk/github/Modular-MoPSS-RFID/.pio/libdeps/adafruit_itsybitsy_m0/Adafruit BusIO",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/Wire",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/SPI",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_ZeroDMA",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_ZeroDMA/utility",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_TinyUSB_Arduino/src",
+                    "/home/birk/.platformio/packages/framework-cmsis/CMSIS/Core/Include",
+                    "/home/birk/.platformio/packages/framework-cmsis-atmel/CMSIS/Device/ATMEL",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/cores/arduino",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/Adafruit_TinyUSB_Arduino/src/arduino",
+                    "/home/birk/.platformio/packages/framework-cmsis/CMSIS/DSP/Include",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/variants/itsybitsy_m0",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/CI_Tests",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/HID",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/I2S/src",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/SAMD_AnalogCorrection/src",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/SDU/src",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/Servo/src",
+                    "/home/birk/.platformio/packages/framework-arduino-samd-adafruit/libraries/USBHost/src",
+                    ""
+                ]
+            },
+            "defines": [
+                "PLATFORMIO=60105",
+                "ARDUINO_ITSYBITSY_M0",
+                "ADAFRUIT_ITSYBITSY_M0",
+                "CRYSTALLESS",
+                "ARM_MATH_CM0PLUS",
+                "__SAMD21G18A__",
+                "ARDUINO=10805",
+                "F_CPU=48000000L",
+                "USBCON",
+                "USB_VID=0x239A",
+                "USB_PID=0x800F",
+                "USB_PRODUCT=\"ItsyBitsy M0 Express\"",
+                "USB_MANUFACTURER=\"Adafruit\"",
+                "ARDUINO_ARCH_SAMD",
+                "USB_CONFIG_POWER=100",
+                "ARDUINO_SAMD_ADAFRUIT",
+                ""
+            ],
+            "cStandard": "c11",
+            "cppStandard": "c++11",
+            "compilerPath": "/home/birk/.platformio/packages/toolchain-gccarmnoneeabi/bin/arm-none-eabi-gcc",
+            "compilerArgs": [
+                "-mcpu=cortex-m0plus",
+                "-mthumb",
+                ""
+            ]
         }
     ],
     "version": 4
