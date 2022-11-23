@@ -13,21 +13,25 @@ D18 - SDA
 D19 - SCL
 
 *///----------------------------------------------------------------------------
-#include <Wire.h>
+#include <i2c_t3.h>
+
+//----- declaring variables ----------------------------------------------------
+//Current Version of the program
+const char HARDWARE_REV[] = "v7.0";
+const char SOFTWARE_REV[] = "v1.0";
 
 //LEDs
 const uint8_t statusLED = 22;
 const uint8_t readLED = 23;
-uint8_t ledset = 0;
 
 //used for interfacing EM4095
 const uint8_t DMOD = 6;         //dmod pin
-const uint8_t SHD = 7;         //shutdown pin adjust port as well!
+const uint8_t SHD = 7;          //shutdown pin adjust port as well!
 const uint8_t CLK = 5;          //RDY/CLK Pin
 const uint8_t pulseTime = 181;  //181 uS , 8688 Systick ticks
 
 volatile uint8_t headerDetect = 0;  //count zeros (and one 1) to detect header
-volatile uint8_t findstart = 1;  //flag to toggle looking for header
+volatile uint8_t findstart = 1;     //flag to toggle looking for header
 
 volatile uint8_t bittic = 0;    //count bits from tag
 volatile uint8_t bytetic = 0;   //count bytes from tag
@@ -40,7 +44,7 @@ volatile uint8_t tick = 0;        //to help translate two short pulses
 volatile uint8_t tagfetched = 0;  //flag to indicate a complete tag was found
 
 volatile uint32_t freq = 0;       //counter to determine resonant frequency
-uint32_t freqgrab;
+uint32_t freqgrab;                //buffer for sending
 
 uint32_t tagfetched_time0 = 0;    //time the tag was fetched
 uint32_t tagfetched_time1 = 0;
@@ -50,16 +54,15 @@ uint8_t last_tagbytes[10];        //contains the tag from the last time we read 
 
 uint8_t buffer[6];                //array containing a copy of the last tag that was detected, emptied once sent, without datablock and crc
 
-volatile uint8_t operatingmode = 0;        //0 for switching antenna, 1 for setup
-volatile uint8_t sendmode = 0;             //which data to send on request
-volatile uint8_t measure_frequency = 0;    //flag to do one frequency measurement
+volatile uint8_t sendmode = 0;          //which data to send on request
+volatile uint8_t measure_frequency = 0; //flag to do one frequency measurement
 
 //##############################################################################
 //##### SETUP ##################################################################
 //##############################################################################
 void setup(){
   //I2C Setup
-  Wire.begin(0x08);             //join I2C Bus at address 8 (0-7 is reserved)
+  Wire.begin(I2C_SLAVE, 0x09, I2C_PINS_18_19, I2C_PULLUP_EXT, 100000);  //join I2C Bus at address 8 (0-7 is reserved)
   Wire.onRequest(sendData);     //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
   
@@ -116,7 +119,6 @@ void loop(){
 
     //light up LED on tag detection
     digitalWrite(readLED,HIGH);
-    ledset = 1;
 
     //reverse bits in bytes 11.5uS max
     for(uint8_t i = 0;i < 6;i++){
@@ -139,7 +141,6 @@ void loop(){
 //    {
 //      //use onboard red LED to indicate tag
 //      digitalWrite(,HIGH);
-//      ledset = 1;
 //    }
 
     for(uint8_t i = 0;i < 6;i++){
@@ -152,7 +153,6 @@ void loop(){
   else{ //if time since last tag was fetched is longer than 46ms, turn off LED (means tag left read range)
     if((millis() - tagfetched_time0) > 46){
       digitalWrite(readLED,LOW);
-      ledset = 0;
     }
   }
 } //end of loop
@@ -270,43 +270,36 @@ void sendData(){ //~12.6-22.6-uS
     //buffer contains last read tag id, or all 0 if no new tag since last send
     Wire.write(buffer,6);
 
-    //clear buffer after send (sends last tag is read, no matter how long ago)
+    //clear buffer after send (sends last tag that was read, no matter how long ago)
     for(uint8_t i = 0;i < 6;i++){
       buffer[i] = 0;
     }
   }
   if(sendmode == 1){  //send frequency measurement
-    uint8_t freqbuffer[4]; //array containing frequency
-    freqbuffer[0] = (freqgrab >> 0  & 0xff);
-    freqbuffer[1] = (freqgrab >> 8  & 0xff);
-    freqbuffer[2] = (freqgrab >> 16 & 0xff);
-    freqbuffer[3] = (freqgrab >> 24 & 0xff);
-    Wire.write(freqbuffer,4); //send resonant frequency (or other info)
+    uint8_t sendbuffer[4]; //array containing frequency
+    sendbuffer[0] = (freqgrab >> 0  & 0xff);
+    sendbuffer[1] = (freqgrab >> 8  & 0xff);
+    sendbuffer[2] = (freqgrab >> 16 & 0xff);
+    sendbuffer[3] = (freqgrab >> 24 & 0xff);
+
+    Wire.write(sendbuffer,4); //send resonant frequency (or other info)
   }
 }
 
 //receive instructions (toggle antenna on/off)
-void receiveEvent(int bytes_incoming){
-  //volatile uint8_t c = Wire.read();
-  volatile uint8_t c;
-  while(Wire.available()){
-    c = Wire.read();
-    Serial.print(c);
-  }
-  Serial.println("-");
+void receiveEvent(size_t bytes_incoming){
+  volatile uint8_t c = Wire.read();
 
   if(c == 0) digitalWriteFast(SHD,HIGH); //high is antenna off
   if(c == 1) digitalWriteFast(SHD,LOW);  //low is antenna on
-  if(c == 2){
-    sendmode = 0; //RFID mode (tag transmit)
-  }
+  if(c == 2) sendmode = 0; //RFID mode (tag transmit)
   if(c == 3){
     sendmode = 1; //measure mode (frequency transmit)
     measure_frequency = 1;
   }
 }
 
-//measure resonant frequency and save to IIC-able array (tag reading will be disabled during measurement)
+//measure resonant frequency (tag reading will be disabled during measurement)
 void measureFreq(){
   freqgrab = 0;
   digitalWriteFast(SHD,LOW); //enable antenna
@@ -314,9 +307,9 @@ void measureFreq(){
   delay(100); //allow antenna to power up
   attachInterrupt(digitalPinToInterrupt(CLK),freqCounter,RISING);
 
-  uint32_t starttime = millis() + 1000; //one second
+  uint32_t stoptime = millis() + 1000; //one second
   freq = 0;
-  while(millis() < starttime); //wait one second
+  while(millis() < stoptime); //wait one second
   freqgrab = freq;
   detachInterrupt(digitalPinToInterrupt(CLK));
   attachInterrupt(digitalPinToInterrupt(DMOD),tag_watch, CHANGE);
