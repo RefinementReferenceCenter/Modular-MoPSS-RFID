@@ -96,9 +96,6 @@ void loop(){
   // digitalWriteFast(SHD,HIGH);
   // digitalWrite(statusLED,LOW);
 
-  //Serial.print(sendmode);
-  delay(2);
-
   //to show reader is in operating mode
   if(sendmode == 1){ //if in setup mode do various things
     digitalWrite(statusLED,HIGH);
