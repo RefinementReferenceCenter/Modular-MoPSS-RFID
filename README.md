@@ -6,4 +6,4 @@ Functionality:
 - Enable RFID reader
 - Disable RFID reader
 - Fetch latest RFID-Tag read
-- Fetch Antenna resonant frequency (Important for reading performance)
+- Fetch antenna resonant frequency (Important for reading performance)
