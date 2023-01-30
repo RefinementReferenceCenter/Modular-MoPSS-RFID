@@ -2,13 +2,12 @@
 - PJRC Teensy LC pin mapping - Hardware Revision v7.0
 
 D5  - RDY/CLK ready/clock
-D6  - DMOD demodulation (out from EM4095=
+D6  - DMOD demodulation (out from EM4095)
 D7  - SHD shutdown
 
 D22 - Status LED
 D23 - Read LED
 
-//Comms
 D18 - SDA
 D19 - SCL
 
@@ -16,9 +15,7 @@ D19 - SCL
 #include <i2c_t3.h>
 
 //----- declaring variables ----------------------------------------------------
-//Current Version of the program
-const char HARDWARE_REV[] = "v7.0";
-const char SOFTWARE_REV[] = "v1.0";
+const char SOFTWARE_REV[] = "v1.0.0"; //Current Version of the program
 
 //LEDs
 const uint8_t statusLED = 22;
@@ -33,14 +30,14 @@ const uint8_t pulseTime = 181;  //181 uS , 8688 Systick ticks
 volatile uint8_t headerDetect = 0;  //count zeros (and one 1) to detect header
 volatile uint8_t findstart = 1;     //flag to toggle looking for header
 
-volatile uint8_t bittic = 0;    //count bits from tag
-volatile uint8_t bytetic = 0;   //count bytes from tag
+volatile uint8_t bittic = 0;      //count bits from tag
+volatile uint8_t bytetic = 0;     //count bytes from tag
 
 //timing of the ISR to detect long/short pulses of the EM4095
 volatile uint32_t tsnap0 = 0;
 volatile uint32_t tsnap1 = 0;
 
-volatile uint8_t tick = 0;        //to help translate two short pulses
+volatile uint8_t toc = 0;         //to help translate two short pulses
 volatile uint8_t tagfetched = 0;  //flag to indicate a complete tag was found
 
 volatile uint32_t freq = 0;       //counter to determine resonant frequency
@@ -172,16 +169,16 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~31uS max
     //record the bitstream by analysing the pulse duration
     //two short pulses translate to one 0
     if((tsnap0 - tsnap1) < pulseTime){
-      if(tick == 1){
+      if(toc == 1){
         headerDetect += 1;
-        tick = 0; //needed to detect two short pulses
+        toc = 0; //needed to detect two short pulses
       }
       else{
-        tick = 1; //first short pulse sets flag to record on second short pulse. Needed to detect two short pulses
+        toc = 1; //first short pulse sets flag to record on second short pulse. Needed to detect two short pulses
       }
     }
     else{
-      tick = 0; //reset flag if we see a long pulse
+      toc = 0; //reset flag if we see a long pulse
 
       //if we receive a 1 (long pulse), check if we received 10 zeros before, otherwise reset
       if(headerDetect == 10){
@@ -195,7 +192,7 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~31uS max
   else{ //do this if we have found a header -------------------------------------
     //----- bit reading block ----- 1.57uS
     if((tsnap0 - tsnap1) < pulseTime){ //duration uS since last level change
-      if(tick == 1){
+      if(toc == 1){
         if(bittic != 8){
           tagbytes[bytetic] = tagbytes[bytetic] << 1;
         }
@@ -203,14 +200,14 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~31uS max
           findstart = 1;
         }
         bittic += 1;
-        tick = 0;
+        toc = 0;
       }
       else{
-        tick = 1;
+        toc = 1;
       }
     }
     else{
-      tick = 0;
+      toc = 0;
 
       if(bittic != 8){
         tagbytes[bytetic] = (tagbytes[bytetic] << 1) | 1;
