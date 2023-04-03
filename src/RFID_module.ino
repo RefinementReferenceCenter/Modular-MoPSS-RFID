@@ -46,8 +46,8 @@ uint32_t freqgrab;                //buffer for sending
 uint32_t tagfetched_time0 = 0;    //time the tag was fetched
 uint32_t tagfetched_time1 = 0;
 
-volatile uint8_t tagbytes[10];    //array containing tag-data and crc check (not data-block)
-uint8_t last_tagbytes[10];        //contains the tag from the last time we read it
+volatile uint8_t tagbytes[13];    //array containing tag-data and crc check (not data-block)
+uint8_t last_tagbytes[13];        //contains the tag from the last time we read it
 
 uint8_t buffer[6];                //array containing a copy of the last tag that was detected, emptied once sent, without datablock and crc
 
@@ -59,9 +59,9 @@ volatile uint8_t measure_frequency = 0; //flag to do one frequency measurement
 //##############################################################################
 void setup(){
   //I2C Setup
-  Wire.begin(I2C_SLAVE, 0x09, I2C_PINS_18_19, I2C_PULLUP_EXT, 100000);  //join I2C Bus at address 8 (0-7 is reserved)
-  Wire.onRequest(sendData);     //what to do when being talked to
-  Wire.onReceive(receiveEvent); //what to do with data received
+  //Wire.begin(I2C_SLAVE, 0x09, I2C_PINS_18_19, I2C_PULLUP_EXT, 100000);  //join I2C Bus at address 8 (0-7 is reserved)
+  //Wire.onRequest(sendData);     //what to do when being talked to
+  //Wire.onReceive(receiveEvent); //what to do with data received
   
   //set pins
   pinMode(SHD,OUTPUT);        //shutdown
@@ -87,7 +87,7 @@ void loop(){
   
   //--- manual antenna mode (for tuning/debugging)
   // delay(1000);
-  // digitalWriteFast(SHD,LOW);
+  digitalWriteFast(SHD,LOW); //enable antenna
   // digitalWrite(statusLED,HIGH);
   // delay(1000);
   // digitalWriteFast(SHD,HIGH);
@@ -115,7 +115,7 @@ void loop(){
     digitalWrite(readLED,HIGH);
 
     //reverse bits in bytes 11.5uS max
-    for(uint8_t i = 0;i < 6;i++){
+    for(uint8_t i = 0;i < 13;i++){
       if((tagbytes[i] & 1) != ((tagbytes[i] >> 7) & 1))        {tagbytes[i] ^=  0b10000001;}
       if(((tagbytes[i] >> 1) & 1) != ((tagbytes[i] >> 6) & 1)) {tagbytes[i] ^=  0b01000010;}
       if(((tagbytes[i] >> 2) & 1) != ((tagbytes[i] >> 5) & 1)) {tagbytes[i] ^=  0b00100100;}
@@ -130,6 +130,28 @@ void loop(){
         sametag = 0;
       }
     }
+
+  digitalWriteFast(SHD,HIGH);
+  delay(500);
+  for(uint8_t i = 0;i < 13;i++){
+    Serial.print(tagbytes[i],BIN);
+    Serial.print("-");
+  }
+  Serial.println("");
+
+  uint8_t ID[6];
+  for(uint8_t k = 0;k < 7;k++){
+    ID[k] = tagbytes[k];
+  }
+  Serial.print(getCountryCode(ID));
+  Serial.print("-");
+  Serial.print(getID(ID));
+  Serial.print("-");
+  uint16_t temp = getTemp(tagbytes); //33-43C
+  Serial.println(temp);  // temp/9+23.3
+
+  Serial.println("--- --- --- --- ---");
+
 
 //    if(sametag != 1) //option to do stuff if tag not the same
 //    {
@@ -154,6 +176,44 @@ void loop(){
 //##############################################################################
 //#####   F U N C T I O N S   ##################################################
 //##############################################################################
+uint32_t getTemp(uint8_t in[13]){
+  uint32_t temp = 0;
+  // temp = (temp | in[12]) << 8;
+  // temp = (temp | in[11]) << 8;
+  // temp = (temp | in[10]);
+  temp = in[10];
+  return temp;
+}
+
+String getID(uint8_t in[6]){
+  uint64_t in64 = 0;
+  in64 |= (in[4] & 0b111111);
+  in64 <<= 8;
+  in64 |= in[3];
+  in64 <<= 8;
+  in64 |= in[2];
+  in64 <<= 8;
+  in64 |= in[1];
+  in64 <<= 8;
+  in64 |= in[0];
+
+  String result = "";
+  while(in64){
+    char c = in64 % 10;
+    in64 /= 10;
+    c += '0'; //add to character zero
+    result = c + result; //concatenate
+  }
+  return result;
+}
+
+//convert byte array to char (RFID countrycode) --------------------------------
+uint16_t getCountryCode(uint8_t in[6]){
+  uint16_t countrycode = 0;
+  countrycode = ((countrycode | in[5]) << 2) | ((in[4] >> 6) & 0b11);
+  return countrycode;
+}
+
 
 //must not take longer than 1ms or else millis function will start to report wrong values
 void tag_watch(){ //Analyse the bitstream und check if data is a tag ~31uS max
@@ -194,7 +254,7 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~31uS max
     if((tsnap0 - tsnap1) < pulseTime){ //duration uS since last level change
       if(toc == 1){
         if(bittic != 8){
-          tagbytes[bytetic] = tagbytes[bytetic] << 1;
+          tagbytes[bytetic] = tagbytes[bytetic] << 1; //received a 0
         }
         else{ //if the 9th bit is not a 1, control bit has failed, look for header again
           findstart = 1;
@@ -210,22 +270,22 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~31uS max
       toc = 0;
 
       if(bittic != 8){
-        tagbytes[bytetic] = (tagbytes[bytetic] << 1) | 1;
+        tagbytes[bytetic] = (tagbytes[bytetic] << 1) | 1; //received a 1
       }
       bittic += 1;
     }
 
-    if(bittic == 9){
+    if(bittic == 9){  //have received 8 bits of data
       bittic = 0;
       bytetic += 1;
     }
 
     //----- CRC check block ----- 26.7uS
     //reached end of transmission/array full -----------------------------------
-    if(bytetic == 10){
+    if(bytetic == 13){
       findstart = 1; //look for start again
 
-      //perform CRC check on received data
+      //perform CRC check on the first 10 bytes of received data
       //this is done at the end (as opposed to parallel) since the control bit will catch a lot of
       //false reads and we can save the time by performing the crc only once (probably)
       uint16_t crc = 0x0; // initialization
