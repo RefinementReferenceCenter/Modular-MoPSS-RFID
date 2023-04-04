@@ -72,7 +72,7 @@ void setup(){
   pinMode(readLED,OUTPUT);    //read LED
   pinMode(2,OUTPUT);          //for timing/debugging purposes
  
-  //while (!Serial); //wait until serial connection is enabled
+  while (!Serial); //wait until serial connection is enabled
 
   //to start ISR, last entry of setup
   attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE);
@@ -133,11 +133,11 @@ void loop(){
 
   digitalWriteFast(SHD,HIGH);
   delay(500);
-  for(uint8_t i = 0;i < 13;i++){
-    Serial.print(tagbytes[i],BIN);
-    Serial.print("-");
-  }
-  Serial.println("");
+  //for(uint8_t i = 0;i < 13;i++){
+  //  Serial.print(tagbytes[i],BIN);
+  //  Serial.print("-");
+  //}
+  //Serial.println("");
 
   uint8_t ID[6];
   for(uint8_t k = 0;k < 7;k++){
@@ -147,8 +147,10 @@ void loop(){
   Serial.print("-");
   Serial.print(getID(ID));
   Serial.print("-");
-  uint16_t temp = getTemp(tagbytes); //33-43C
-  Serial.println(temp);  // temp/9+23.3
+  float temp = getTemp(tagbytes); //33-43C
+  Serial.print(temp);  // temp/9+23.3
+  Serial.print(":");
+  Serial.println(temp*0.108296277+23.22566506);
 
   Serial.println("--- --- --- --- ---");
 
