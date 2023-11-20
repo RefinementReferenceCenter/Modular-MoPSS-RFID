@@ -1,5 +1,5 @@
 /*------------------------------------------------------------------------------
-- PJRC Teensy LC pin mapping - Hardware Revision v7.0
+- PJRC Teensy 4.0 pin mapping - Hardware Revision v7.1
 
 D5  - RDY/CLK ready/clock
 D6  - DMOD demodulation (out from EM4095)
@@ -12,7 +12,7 @@ D18 - SDA
 D19 - SCL
 
 *///----------------------------------------------------------------------------
-#include <i2c_t3.h>
+#include <Wire.h>
 
 //----- declaring variables ----------------------------------------------------
 const char SOFTWARE_REV[] = "v1.0.0"; //Current Version of the program
@@ -59,7 +59,7 @@ volatile uint8_t measure_frequency = 0; //flag to do one frequency measurement
 //##############################################################################
 void setup(){
   //I2C Setup
-  Wire.begin(I2C_SLAVE, 0x09, I2C_PINS_18_19, I2C_PULLUP_EXT, 100000);  //join I2C Bus at address 8 (0-7 is reserved)
+  Wire.begin(0x09);  //join I2C Bus at address 9 (0-7 is reserved)
   Wire.onRequest(sendData);     //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
   
@@ -281,7 +281,7 @@ void sendData(){ //~12.6-22.6-uS
 }
 
 //receive instructions (toggle antenna on/off)
-void receiveEvent(size_t bytes_incoming){
+void receiveEvent(int bytes_incoming){
   volatile uint8_t c = Wire.read();
 
   if(c == 0) digitalWriteFast(SHD,HIGH); //high is antenna off
