@@ -86,12 +86,10 @@ void loop(){
   //startup: 1700us until amplitude >= 99%
   
   //--- manual antenna mode (for tuning/debugging)
-  // delay(1000);
-  // digitalWriteFast(SHD,LOW);
-  // digitalWrite(statusLED,HIGH);
-  // delay(1000);
-  // digitalWriteFast(SHD,HIGH);
-  // digitalWrite(statusLED,LOW);
+  while(1){
+    digitalWriteFast(SHD,LOW);
+    digitalWrite(statusLED,HIGH);
+  }
 
   //to show reader is in operating mode
   if(sendmode == 1){ //if in setup mode do various things
