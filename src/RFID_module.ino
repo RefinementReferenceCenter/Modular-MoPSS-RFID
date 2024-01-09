@@ -152,6 +152,12 @@ void loop(){
   Serial.print(temp);  // temp/9+23.3
   Serial.print(":");
   Serial.println(temp*0.108296277+23.22566506);
+  Serial.print(tagbytes[10],BIN);
+  Serial.print("-");
+  Serial.print(tagbytes[11],BIN);
+  Serial.print("-");
+  Serial.print(tagbytes[12],BIN);
+  Serial.println("");
 
   Serial.println("--- --- --- --- ---");
 
@@ -179,13 +185,23 @@ void loop(){
 //##############################################################################
 //#####   F U N C T I O N S   ##################################################
 //##############################################################################
-uint32_t getTemp(uint8_t in[13]){
-  uint32_t temp = 0;
-  // temp = (temp | in[12]) << 8;
-  // temp = (temp | in[11]) << 8;
-  // temp = (temp | in[10]);
-  temp = in[10];
-  return temp;
+uint32_t getTemp(uint8_t in[13]){ //10 temp, 11 parity, 13 unused
+  uint8_t temp = in[10]; //minimum value reported is 5, at lower temperature jumps to 0
+  uint8_t temp_parity = temp;
+  uint8_t parity_check = in[11];
+  //calculate parity
+  temp_parity ^= temp_parity >> 4;
+  temp_parity ^= temp_parity >> 2;
+  temp_parity ^= temp_parity >> 1;
+  temp_parity = temp_parity & 1;    //0 = even, 1 = odd
+
+  if(temp_parity != parity_check){ //parity_check is 1 if even number of "1" in temp
+    return temp;
+  }
+  else{
+    Serial.print("faulty temp");
+    return 255;
+  }
 }
 
 String getID(uint8_t in[6]){
