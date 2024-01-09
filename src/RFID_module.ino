@@ -44,12 +44,11 @@ volatile uint32_t freq = 0;       //counter to determine resonant frequency
 uint32_t freqgrab;                //buffer for sending
 
 uint32_t tagfetched_time0 = 0;    //time the tag was fetched
-uint32_t tagfetched_time1 = 0;
 
-volatile uint8_t tagbytes[13];    //array containing tag-data, crc check and data-block for temperature
-uint8_t last_tagbytes[13];        //contains the tag from the last time we read it
+volatile uint8_t tagbytes[12];    //array containing tag-data, crc check and data-block for temperature
+uint8_t last_tagbytes[12];        //contains the tag from the last time we read it
 
-uint8_t buffer[6];                //array containing a copy of the last tag that was detected, emptied once sent, without datablock and crc
+uint8_t buffer[7];                //array containing a copy of the last tag that was detected, emptied once sent, with raw temp, without crc
 
 volatile uint8_t sendmode = 0;          //which data to send on request
 volatile uint8_t measure_frequency = 0; //flag to do one frequency measurement
@@ -59,7 +58,7 @@ volatile uint8_t measure_frequency = 0; //flag to do one frequency measurement
 //##############################################################################
 void setup(){
   //I2C Setup
-  Wire.begin(0x09);  //join I2C Bus at address 9 (0-7 is reserved)
+  Wire.begin(0x09);             //join I2C Bus at address 9 (0-7 is reserved)
   Wire.onRequest(sendData);     //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
   
@@ -93,15 +92,14 @@ void loop(){
   // digitalWriteFast(SHD,HIGH);
   // digitalWrite(statusLED,LOW);
 
-  //to show reader is in operating mode
   if(sendmode == 1){ //if in setup mode do various things
-    digitalWrite(statusLED,HIGH);
+    digitalWrite(statusLED,HIGH); //to show reader is in setup mode
     if(measure_frequency){
       measureFreq();
       measure_frequency = 0;
     }
   }
-  if(sendmode == 0){
+  if(sendmode == 0){ //if in "read RFID mode"
     digitalWrite(statusLED,LOW);
   }
 
@@ -111,8 +109,7 @@ void loop(){
     tagfetched = 0; //reset tagfetched flag
     tagfetched_time0 = millis();
 
-    //light up LED on tag detection
-    digitalWrite(readLED,HIGH);
+    digitalWrite(readLED,HIGH); //light up LED on tag detection
 
     //reverse bits in bytes 11.5uS max
     for(uint8_t i = 0;i < 6;i++){
@@ -124,22 +121,24 @@ void loop(){
 
     //compare current tag to last tag
     uint8_t sametag = 1;
-    for(uint8_t i=0;i<10;i++){ //check only first 6 bytes?
+    for(uint8_t i = 0;i < 12;i++){
       if(tagbytes[i] != last_tagbytes[i]){
         last_tagbytes[i] = tagbytes[i];
         sametag = 0;
       }
     }
 
-//    if(sametag != 1) //option to do stuff if tag not the same
+//    if(!sametag) //option to do stuff if tag not the same
 //    {
 //      //use onboard red LED to indicate tag
 //      digitalWrite(,HIGH);
 //    }
-
-    for(uint8_t i = 0;i < 6;i++){
-      buffer[i] = tagbytes[i]; //copy tag we just read into buffer (buffer is emptied once transmitted)
+    
+    //copy tag we just read into buffer for sending (buffer is emptied once transmitted)
+    for(uint8_t i = 0;i < 6;i++){ //first 6 bytes for tag
+      buffer[i] = tagbytes[i]; 
     }
+    buffer[7] = tagbytes[10]; //byte 10 for temperature (8bit value, 255 if faulty read)
 
     //reattach interrupt to watch for tag signal
     attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE);
@@ -222,7 +221,7 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~31uS max
 
     //----- CRC check block ----- 26.7uS
     //reached end of transmission/array full -----------------------------------
-    if(bytetic == 10){
+    if(bytetic == 12){
       findstart = 1; //look for start again
 
       //perform CRC check on received data
@@ -243,18 +242,25 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~31uS max
           }
         }
       }
-
-      if(crc == 0){ //if crc is ok
+      
+      //while we're here check temperature parity bit as well
+      uint8_t temp_parity = tagbytes[10]; //minimum value reported is 5, at lower temperature jumps to 0
+      uint8_t parity_bit = tagbytes[11]; //parity_check is 1 if even number of "1" in temp. 0 if odd no. of "1"
+      //calculate parity
+      temp_parity ^= temp_parity >> 4;
+      temp_parity ^= temp_parity >> 2;
+      temp_parity ^= temp_parity >> 1;
+      temp_parity = temp_parity & 1;    //0 = even, 1 = odd
+      if(temp_parity == parity_bit){  //if parity bit indicates faulty temp reading, set temp to 255, otherwise carry on
+        tagbytes[10] = 255;
+      }
+      
+      if(crc == 0){ //if crc of tag is ok continue, temp isn't important enough to discard read
         tagfetched = 1; //multiple tags could be buffered or interrupt disabled until tag is processed
         detachInterrupt(digitalPinToInterrupt(DMOD)); //if crc checks out, disable interrupt to allow for communication
       }
     }
   }
-}
-
-//get raw temperature value from tag
-uint32_t getTemp(uint8_t in[13]){
-  return in[10]; //temperature is stored in byte 10
 }
 
 //counter to measure resonant frequency for ISR
@@ -284,10 +290,10 @@ void measureFreq(){
 void sendData(){ //~12.6-22.6-uS
   if(sendmode == 0){
     //buffer contains last read tag id, or all 0 if no new tag since last send
-    Wire.write(buffer,6);
+    Wire.write(buffer,7);
 
     //clear buffer after send (sends last tag that was read, no matter how long ago)
-    for(uint8_t i = 0;i < 6;i++){
+    for(uint8_t i = 0;i < 7;i++){
       buffer[i] = 0;
     }
   }
