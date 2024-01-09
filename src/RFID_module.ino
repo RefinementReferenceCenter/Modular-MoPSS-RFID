@@ -23,7 +23,7 @@ const uint8_t readLED = 23;
 
 //used for interfacing EM4095
 const uint8_t DMOD = 6;         //dmod pin
-const uint8_t SHD = 7;          //shutdown pin adjust port as well!
+const uint8_t SHD = 7;          //shutdown pin
 const uint8_t CLK = 5;          //RDY/CLK Pin
 const uint8_t pulseTime = 181;  //181 uS , 8688 Systick ticks
 
@@ -46,8 +46,8 @@ uint32_t freqgrab;                //buffer for sending
 uint32_t tagfetched_time0 = 0;    //time the tag was fetched
 uint32_t tagfetched_time1 = 0;
 
-volatile uint8_t tagbytes[10];    //array containing tag-data and crc check (not data-block)
-uint8_t last_tagbytes[10];        //contains the tag from the last time we read it
+volatile uint8_t tagbytes[13];    //array containing tag-data, crc check and data-block for temperature
+uint8_t last_tagbytes[13];        //contains the tag from the last time we read it
 
 uint8_t buffer[6];                //array containing a copy of the last tag that was detected, emptied once sent, without datablock and crc
 
@@ -252,9 +252,31 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~31uS max
   }
 }
 
-//measure resonant frequency
+//get raw temperature value from tag
+uint32_t getTemp(uint8_t in[13]){
+  return in[10]; //temperature is stored in byte 10
+}
+
+//counter to measure resonant frequency for ISR
 void freqCounter(){
   freq++; //count number of rising edges on CLK
+}
+
+//measure resonant frequency (tag reading will be disabled during measurement)
+void measureFreq(){
+  freqgrab = 0;
+  digitalWriteFast(SHD,LOW); //enable antenna
+  detachInterrupt(digitalPinToInterrupt(DMOD));
+  delay(100); //allow antenna to power up
+  attachInterrupt(digitalPinToInterrupt(CLK),freqCounter,RISING);
+
+  uint32_t stoptime = millis() + 1000; //one second
+  freq = 0;
+  while(millis() < stoptime); //wait one second
+  freqgrab = freq;
+  detachInterrupt(digitalPinToInterrupt(CLK));
+  attachInterrupt(digitalPinToInterrupt(DMOD),tag_watch, CHANGE);
+  digitalWriteFast(SHD,HIGH); //disable antenna
 }
 
 // I2C functions
@@ -293,19 +315,4 @@ void receiveEvent(int bytes_incoming){
   }
 }
 
-//measure resonant frequency (tag reading will be disabled during measurement)
-void measureFreq(){
-  freqgrab = 0;
-  digitalWriteFast(SHD,LOW); //enable antenna
-  detachInterrupt(digitalPinToInterrupt(DMOD));
-  delay(100); //allow antenna to power up
-  attachInterrupt(digitalPinToInterrupt(CLK),freqCounter,RISING);
 
-  uint32_t stoptime = millis() + 1000; //one second
-  freq = 0;
-  while(millis() < stoptime); //wait one second
-  freqgrab = freq;
-  detachInterrupt(digitalPinToInterrupt(CLK));
-  attachInterrupt(digitalPinToInterrupt(DMOD),tag_watch, CHANGE);
-  digitalWriteFast(SHD,HIGH); //disable antenna
-}
