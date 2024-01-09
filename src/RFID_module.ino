@@ -1,5 +1,5 @@
 /*------------------------------------------------------------------------------
-- PJRC Teensy LC pin mapping - Hardware Revision v7.0
+- PJRC Teensy 4.0 pin mapping - Hardware Revision v7.1
 
 D5  - RDY/CLK ready/clock
 D6  - DMOD demodulation (out from EM4095)
@@ -12,7 +12,7 @@ D18 - SDA
 D19 - SCL
 
 *///----------------------------------------------------------------------------
-#include <i2c_t3.h>
+#include <Wire.h>
 
 //----- declaring variables ----------------------------------------------------
 const char SOFTWARE_REV[] = "v1.0.0"; //Current Version of the program
@@ -46,7 +46,7 @@ uint32_t freqgrab;                //buffer for sending
 uint32_t tagfetched_time0 = 0;    //time the tag was fetched
 uint32_t tagfetched_time1 = 0;
 
-volatile uint8_t tagbytes[13];    //array containing tag-data and crc check (not data-block)
+volatile uint8_t tagbytes[13];    //array containing tag-data and crc check
 uint8_t last_tagbytes[13];        //contains the tag from the last time we read it
 
 uint8_t buffer[6];                //array containing a copy of the last tag that was detected, emptied once sent, without datablock and crc
@@ -72,8 +72,9 @@ void setup(){
   pinMode(readLED,OUTPUT);    //read LED
   pinMode(2,OUTPUT);          //for timing/debugging purposes
  
-  while (!Serial); //wait until serial connection is enabled
-
+  while(!Serial); //wait until serial connection is enabled
+  Serial.println("up and runnning");
+  
   //to start ISR, last entry of setup
   attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE);
 } 
@@ -121,7 +122,7 @@ void loop(){
       if(((tagbytes[i] >> 2) & 1) != ((tagbytes[i] >> 5) & 1)) {tagbytes[i] ^=  0b00100100;}
       if(((tagbytes[i] >> 3) & 1) != ((tagbytes[i] >> 4) & 1)) {tagbytes[i] ^=  0b00011000;}
     }
-
+    
     //compare current tag to last tag
     uint8_t sametag = 1;
     for(uint8_t i=0;i<10;i++){ //check only first 6 bytes?
