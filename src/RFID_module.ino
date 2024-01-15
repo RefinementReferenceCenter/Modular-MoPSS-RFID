@@ -60,7 +60,7 @@ uint8_t allowsend = 1;            //flag to disable sending while we are modifyi
 //##############################################################################
 void setup(){
   //I2C Setup
-  Wire.begin(0x09);             //join I2C Bus at address 9 (0-7 is reserved)
+  Wire.begin(0x08);             //join I2C Bus at address 9 (0-7 is reserved)
   Wire.onRequest(sendData);     //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
   
@@ -159,7 +159,7 @@ void loop(){
 //##############################################################################
 
 //must not take longer than 1ms or else millis function will start to report wrong values
-void tag_watch(){ //Analyse the bitstream und check if data is a tag ~31uS max
+void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24MHz
   //store time when ISR started, and the last time it started 2.18uS
   tsnap1 = tsnap0;
   tsnap0 = micros();    //~1.25uS
@@ -287,13 +287,14 @@ void measureFreq(){
   while(millis() < stoptime); //wait one second
   freqgrab = freq;
   detachInterrupt(digitalPinToInterrupt(CLK));
-  attachInterrupt(digitalPinToInterrupt(DMOD),tag_watch, CHANGE);
   digitalWriteFast(SHD,HIGH); //disable antenna
+  delay(10); //allow antenna to shut down
+  attachInterrupt(digitalPinToInterrupt(DMOD),tag_watch, CHANGE);
 }
 
 // I2C functions
 //send data on request
-void sendData(){ //~12.6-22.6-uS
+void sendData(){ //~7uS @ 24MHz
   if(sendmode == 0){
     //buffer contains last read tag id, or all 0 if no new tag since last send
     if(allowsend){
