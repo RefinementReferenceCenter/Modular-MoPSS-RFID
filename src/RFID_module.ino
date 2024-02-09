@@ -40,7 +40,7 @@ volatile uint32_t tsnap1 = 0;
 volatile uint8_t toc = 0;         //to help translate two short pulses
 volatile uint8_t tagfetched = 0;  //flag to indicate a complete tag was found
 
-volatile uint32_t freq = 0;       //counter to determine resonant frequency
+volatile uint32_t freq;           //counter to determine resonant frequency
 uint32_t freqgrab;                //buffer for sending
 
 uint32_t tagfetched_time0 = 0;    //time the tag was fetched
@@ -60,7 +60,7 @@ uint8_t allowsend = 1;            //flag to disable sending while we are modifyi
 //##############################################################################
 void setup(){
   //I2C Setup
-  Wire.begin(0x08);             //join I2C Bus at address 9 (0-7 is reserved)
+  Wire.begin(0x0d);             //join I2C Bus at address 9 (0-7 is reserved)
   Wire.onRequest(sendData);     //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
   
@@ -72,12 +72,12 @@ void setup(){
   pinMode(statusLED,OUTPUT);  //status LED
   pinMode(readLED,OUTPUT);    //read LED
   pinMode(2,OUTPUT);          //for timing/debugging purposes
- 
+  
   //while (!Serial); //wait until serial connection is enabled
-
+  
   //to start ISR, last entry of setup
   attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE);
-} 
+}
 
 //##############################################################################
 //##### LOOP ###################################################################
@@ -93,26 +93,26 @@ void loop(){
   // delay(1000);
   // digitalWriteFast(SHD,HIGH);
   // digitalWrite(statusLED,LOW);
-
+  
   if(sendmode == 1){ //if in setup mode do various things
-    digitalWrite(statusLED,HIGH); //to show reader is in setup mode
+    //digitalWrite(statusLED,HIGH); //to show reader is in setup mode
     if(measure_frequency){
       measureFreq();
       measure_frequency = 0;
     }
   }
   if(sendmode == 0){ //if in "read RFID mode"
-    digitalWrite(statusLED,LOW);
+    //digitalWrite(statusLED,LOW);
   }
-
+  
   //wait until ISR reports a complete tag
   if(tagfetched == 1){
     
     tagfetched = 0; //reset tagfetched flag
     tagfetched_time0 = millis();
-
+    
     digitalWrite(readLED,HIGH); //light up LED on tag detection
-
+    
     //reverse bits in bytes 11.5uS max
     for(uint8_t i = 0;i < 12;i++){
       if((tagbytes[i] & 1) != ((tagbytes[i] >> 7) & 1))        {tagbytes[i] ^=  0b10000001;}
@@ -120,7 +120,7 @@ void loop(){
       if(((tagbytes[i] >> 2) & 1) != ((tagbytes[i] >> 5) & 1)) {tagbytes[i] ^=  0b00100100;}
       if(((tagbytes[i] >> 3) & 1) != ((tagbytes[i] >> 4) & 1)) {tagbytes[i] ^=  0b00011000;}
     }
-
+    
     //compare current tag to last tag (including temp)
     uint8_t sametag = 1;
     for(uint8_t i = 0;i < 12;i++){
@@ -129,7 +129,7 @@ void loop(){
         sametag = 0;
       }
     }
-
+    
 //    if(!sametag) //option to do stuff if tag not the same
 //    {
 //      //use onboard red LED to indicate tag
@@ -137,12 +137,12 @@ void loop(){
 //    }
     
     //copy tag we just read into buffer for sending (buffer is emptied once transmitted)
-    allowsend = 0; //don't allow sending during copying
+    //allowsend = 0; //don't allow sending during copying
     for(uint8_t i = 0;i < 6;i++){ //first 6 bytes for tag
       buffer[i] = tagbytes[i]; 
     }
     buffer[6] = checkTemp(tagbytes[10],tagbytes[11]); //byte 10 for temperature, byte 11 for checkbit, return 0 if faulty temp read
-    allowsend = 1;
+    //allowsend = 1;
     
     //reattach interrupt to watch for tag signal
     attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE);
@@ -163,7 +163,7 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24M
   //store time when ISR started, and the last time it started 2.18uS
   tsnap1 = tsnap0;
   tsnap0 = micros();    //~1.25uS
-
+  
   //record the bit-stream from the tag and wait until the tag-header is detected
   //the tag header is: 0000 0000 001
   //----------------------------------------------------------------------------
@@ -182,7 +182,7 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24M
     }
     else{
       toc = 0; //reset flag if we see a long pulse
-
+      
       //if we receive a 1 (long pulse), check if we received 10 zeros before, otherwise reset
       if(headerDetect == 10){
         findstart = 0; //toggle flag, we found the start
@@ -211,32 +211,32 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24M
     }
     else{
       toc = 0;
-
+      
       if(bittic != 8){
         tagbytes[bytetic] = (tagbytes[bytetic] << 1) | 1;
       }
       bittic += 1;
     }
-
+    
     if(bittic == 9){
       bittic = 0;
       bytetic += 1;
     }
-
+    
     //----- CRC check block ----- 26.7uS
     //reached end of transmission/array full -----------------------------------
     if(bytetic == 12){
       findstart = 1; //look for start again
-
+      
       //perform CRC check on received data
       //this is done at the end (as opposed to parallel) since the control bit will catch a lot of
       //false reads and we can save the time by performing the crc only once (probably)
       uint16_t crc = 0x0; // initialization
       uint16_t polynomial = 0x1021; // polynomial to calculate crc, actually 0x11021 but first bit is always reversed
-
+      
       for(uint8_t h = 0;h < 10;h++){ //iterate through all 8+2 bytes tagdata+crc
         uint8_t tagbyte = tagbytes[h]; //copy first byte of tag-data
-
+        
         for(uint8_t i = 0;i < 8;i++){ //iterate through 8 bits
           uint8_t bit = (tagbyte >> (7-i) & 1) == 1; //returns 1/0 for each bit starting @ msb for the current byte
           uint8_t crcmsb = ((crc >> 15) & 1) == 1;   //returns 1/0 for msb of the crc
@@ -257,7 +257,7 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24M
 //get temperature and perform parity bit check
 uint8_t checkTemp(uint8_t temp, uint8_t parity_bit){
   uint8_t temp_parity = temp; //minimum value reported is 5, at lower temperature jumps to 0
-
+  
   //calculate parity, parity_check is 1 if even number of "1" in temp. 0 if odd no. of "1"
   temp_parity ^= temp_parity >> 4;
   temp_parity ^= temp_parity >> 2;
@@ -275,21 +275,25 @@ void freqCounter(){
 }
 
 //measure resonant frequency (tag reading will be disabled during measurement)
-void measureFreq(){
+uint32_t measureFreq(){
   freqgrab = 0;
   digitalWriteFast(SHD,LOW); //enable antenna
   detachInterrupt(digitalPinToInterrupt(DMOD));
   delay(100); //allow antenna to power up
-  attachInterrupt(digitalPinToInterrupt(CLK),freqCounter,RISING);
-
-  uint32_t stoptime = millis() + 1000; //one second
   freq = 0;
-  while(millis() < stoptime); //wait one second
+  
+  attachInterrupt(digitalPinToInterrupt(CLK),freqCounter,RISING);
+  elapsedMillis duration;
+  
+  while(duration < 1000); //wait 1 second
   freqgrab = freq;
   detachInterrupt(digitalPinToInterrupt(CLK));
+  
   digitalWriteFast(SHD,HIGH); //disable antenna
   delay(10); //allow antenna to shut down
   attachInterrupt(digitalPinToInterrupt(DMOD),tag_watch, CHANGE);
+  
+  return freqgrab;
 }
 
 // I2C functions
@@ -304,7 +308,7 @@ void sendData(){ //~7uS @ 24MHz
       uint8_t empty[7] = {0,0,0,0,0,0,0};
       Wire.write(empty,7);  //has to write something
     }
-
+    
     //clear buffer after send (sends last tag that was read, no matter how long ago)
     for(uint8_t i = 0;i < 7;i++){
       buffer[i] = 0;
@@ -316,7 +320,7 @@ void sendData(){ //~7uS @ 24MHz
     sendbuffer[1] = (freqgrab >> 8  & 0xff);
     sendbuffer[2] = (freqgrab >> 16 & 0xff);
     sendbuffer[3] = (freqgrab >> 24 & 0xff);
-
+    
     Wire.write(sendbuffer,4); //send resonant frequency (or other info)
   }
 }
@@ -324,9 +328,15 @@ void sendData(){ //~7uS @ 24MHz
 //receive instructions (toggle antenna on/off)
 void receiveEvent(int bytes_incoming){
   volatile uint8_t c = Wire.read();
-
-  if(c == 0) digitalWriteFast(SHD,HIGH); //high is antenna off
-  if(c == 1) digitalWriteFast(SHD,LOW);  //low is antenna on
+  
+  if(c == 0){
+    digitalWriteFast(SHD,HIGH); //high is antenna off
+    digitalWriteFast(statusLED,LOW);
+  }
+  if(c == 1){
+    digitalWriteFast(SHD,LOW);  //low is antenna on
+    digitalWriteFast(statusLED,HIGH);
+  }
   if(c == 2) sendmode = 0; //RFID mode (tag transmit)
   if(c == 3){
     sendmode = 1; //measure mode (frequency transmit)
