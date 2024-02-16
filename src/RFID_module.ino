@@ -12,7 +12,7 @@ D18 - SDA
 D19 - SCL
 
 *///----------------------------------------------------------------------------
-#include <Wire.h>
+#include <i2c_driver_wire.h> //I2C communication !!! libraries using Wire.h must be adjusted to use i2c_driver_wire.h instead !!!
 
 //----- declaring variables ----------------------------------------------------
 const char SOFTWARE_REV[] = "v1.0.0"; //Current Version of the program
@@ -52,8 +52,6 @@ uint8_t buffer[7];       //array containing a copy of the last tag that was dete
 
 volatile uint8_t sendmode = 0;          //which data to send on request
 volatile uint8_t measure_frequency = 0; //flag to do one frequency measurement
-
-uint8_t allowsend = 1;            //flag to disable sending while we are modifying the buffer
 
 //##############################################################################
 //##### SETUP ##################################################################
@@ -137,12 +135,10 @@ void loop(){
 //    }
     
     //copy tag we just read into buffer for sending (buffer is emptied once transmitted)
-    //allowsend = 0; //don't allow sending during copying
     for(uint8_t i = 0;i < 6;i++){ //first 6 bytes for tag
       buffer[i] = tagbytes[i]; 
     }
     buffer[6] = checkTemp(tagbytes[10],tagbytes[11]); //byte 10 for temperature, byte 11 for checkbit, return 0 if faulty temp read
-    //allowsend = 1;
     
     //reattach interrupt to watch for tag signal
     attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE);
@@ -277,6 +273,7 @@ void freqCounter(){
 //measure resonant frequency (tag reading will be disabled during measurement)
 uint32_t measureFreq(){
   freqgrab = 0;
+  digitalWrite(statusLED,HIGH);
   digitalWriteFast(SHD,LOW); //enable antenna
   detachInterrupt(digitalPinToInterrupt(DMOD));
   delay(100); //allow antenna to power up
@@ -292,7 +289,7 @@ uint32_t measureFreq(){
   digitalWriteFast(SHD,HIGH); //disable antenna
   delay(10); //allow antenna to shut down
   attachInterrupt(digitalPinToInterrupt(DMOD),tag_watch, CHANGE);
-  
+  digitalWrite(statusLED,LOW);
   return freqgrab;
 }
 
@@ -301,13 +298,7 @@ uint32_t measureFreq(){
 void sendData(){ //~7uS @ 24MHz
   if(sendmode == 0){
     //buffer contains last read tag id, or all 0 if no new tag since last send
-    if(allowsend){
-      Wire.write(buffer,7);
-    }
-    else{
-      uint8_t empty[7] = {0,0,0,0,0,0,0};
-      Wire.write(empty,7);  //has to write something
-    }
+    Wire.write(buffer,7);
     
     //clear buffer after send (sends last tag that was read, no matter how long ago)
     for(uint8_t i = 0;i < 7;i++){
