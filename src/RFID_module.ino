@@ -58,7 +58,7 @@ volatile uint8_t measure_frequency = 0; //flag to do one frequency measurement
 //##############################################################################
 void setup(){
   //I2C Setup
-  Wire.begin(0x0d);             //join I2C Bus at address 9 (0-7 is reserved)
+  Wire.begin(0x0b);             //join I2C Bus at address 9 (0-7 is reserved)
   Wire.onRequest(sendData);     //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
   
@@ -94,9 +94,13 @@ void loop(){
   
   if(sendmode == 1){ //if in setup mode do various things
     //digitalWrite(statusLED,HIGH); //to show reader is in setup mode
-    if(measure_frequency){
+    if(measure_frequency==1){
       measureFreq();
       measure_frequency = 0;
+    }
+    if(measure_frequency==2){
+      measureFreqCont();
+      //measure_frequency = 0;
     }
   }
   if(sendmode == 0){ //if in "read RFID mode"
@@ -293,6 +297,32 @@ uint32_t measureFreq(){
   return freqgrab;
 }
 
+//measure resonant frequency continously for tuning(tag reading will be disabled during measurement)
+uint32_t measureFreqCont(){
+  //freqgrab = 0;
+  digitalWrite(statusLED,HIGH);
+  digitalWriteFast(SHD,LOW); //enable antenna
+  detachInterrupt(digitalPinToInterrupt(DMOD));
+  delay(100); //allow antenna to power up
+  freq = 0;
+  
+  attachInterrupt(digitalPinToInterrupt(CLK),freqCounter,RISING);
+  elapsedMillis duration;
+  
+  while(duration < 500); //wait 1 second
+  freqgrab = freq*2;
+  detachInterrupt(digitalPinToInterrupt(CLK));
+  
+  digitalWriteFast(SHD,HIGH); //disable antenna
+  delay(10); //allow antenna to shut down
+  attachInterrupt(digitalPinToInterrupt(DMOD),tag_watch, CHANGE);
+  digitalWrite(statusLED,LOW);
+  return freqgrab;
+}
+
+
+
+
 // I2C functions
 //send data on request
 void sendData(){ //~7uS @ 24MHz
@@ -332,6 +362,10 @@ void receiveEvent(int bytes_incoming){
   if(c == 3){
     sendmode = 1; //measure mode (frequency transmit)
     measure_frequency = 1;
+  }
+  if(c == 4){
+    sendmode = 1; //measure mode (continous)
+    measure_frequency = 2;
   }
 }
 
