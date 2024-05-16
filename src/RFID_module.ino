@@ -14,6 +14,9 @@ D19 - SCL
 *///----------------------------------------------------------------------------
 #include <i2c_driver_wire.h> //I2C communication !!! libraries using Wire.h must be adjusted to use i2c_driver_wire.h instead !!!
 
+#ifndef MODULE_ADDRESS
+#define MODULE_ADDRESS 0x08
+#endif
 //----- declaring variables ----------------------------------------------------
 const char SOFTWARE_REV[] = "v1.0.0"; //Current Version of the program
 
@@ -58,7 +61,7 @@ volatile uint8_t measure_frequency = 0; //flag to do one frequency measurement
 //##############################################################################
 void setup(){
   //I2C Setup
-  Wire.begin(0x0b);             //join I2C Bus at address 9 (0-7 is reserved)
+  Wire.begin(MODULE_ADDRESS);             //join I2C Bus at address 9 (0-7 is reserved)
   Wire.onRequest(sendData);     //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
   
