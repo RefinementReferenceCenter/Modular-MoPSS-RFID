@@ -51,20 +51,32 @@ uint32_t tagfetched_time0 = 0;    //time the tag was fetched
 volatile uint8_t tagbytes[12];    //array containing tag-data, crc check and data-block for temperature
 uint8_t last_tagbytes[12];        //contains the tag from the last time we read it
 
-uint8_t buffer[7];       //array containing a copy of the last tag that was detected, emptied once sent, with raw temp, without crc
+uint8_t buffer[8];       //array containing a copy of the last tag that was detected, emptied once sent, with raw temp, without crc
 
 volatile uint8_t sendmode = 0;          //which data to send on request
 volatile uint8_t measure_frequency = 0; //flag to do one frequency measurement
+
+elapsedMillis lastCLKChange=0; //How long since the clock pin flipped. Used for detecting disconnected
+bool lastCLK,nowCLK,isRunning =0;
+
+#define ANTENNA_WATCHDOG_TIME_MS 2000
+#ifdef DEBUG_OUTPUT
+  elapsedMillis timerLED;
+  bool s;
+  #endif
+  
 
 //##############################################################################
 //##### SETUP ##################################################################
 //##############################################################################
 void setup(){
+  pinMode(13,OUTPUT);
+  digitalWrite(13,1);
   //I2C Setup
   Wire.begin(MODULE_ADDRESS);             //join I2C Bus at address 9 (0-7 is reserved)
   Wire.onRequest(sendData);     //what to do when being talked to
   Wire.onReceive(receiveEvent); //what to do with data received
-  
+    
   //set pins
   pinMode(SHD,OUTPUT);        //shutdown
   digitalWrite(SHD,HIGH);     //disable antenna on startup
@@ -74,16 +86,29 @@ void setup(){
   pinMode(readLED,OUTPUT);    //read LED
   pinMode(2,OUTPUT);          //for timing/debugging purposes
   
+  
   //while (!Serial); //wait until serial connection is enabled
   
+    #ifdef DEBUG_OUTPUT
+    Serial.begin(115200);
+    Serial.print("# Modular MoPSS RFID version: ");
+    Serial.println(SOFTWARE_REV);
+  
+    s=false;
+    #endif
   //to start ISR, last entry of setup
   attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE);
+  delay(100);
+  digitalWrite(13,0);
+  digitalWrite(SHD,0);
+  lastCLKChange=0;
 }
 
 //##############################################################################
 //##### LOOP ###################################################################
 //##############################################################################
 void loop(){
+  
   //shutdown: 30us until amplitude <= 1%
   //startup: 1700us until amplitude >= 99%
   
@@ -94,6 +119,16 @@ void loop(){
   // delay(1000);
   // digitalWriteFast(SHD,HIGH);
   // digitalWrite(statusLED,LOW);
+  #ifdef DEBUG_OUTPUT  
+
+  if (timerLED>250) 
+  {
+    timerLED=0;
+    s=!s;
+    digitalWrite(13,s);
+    
+  }
+  #endif 
   
   if(sendmode == 1){ //if in setup mode do various things
     //digitalWrite(statusLED,HIGH); //to show reader is in setup mode
@@ -106,8 +141,15 @@ void loop(){
       //measure_frequency = 0;
     }
   }
-  if(sendmode == 0){ //if in "read RFID mode"
+  if(isRunning == 1){ //if in "read RFID mode"
     //digitalWrite(statusLED,LOW);
+  nowCLK=digitalRead(CLK);
+  if(lastCLK!=nowCLK) lastCLKChange=0;
+  else if(lastCLKChange>ANTENNA_WATCHDOG_TIME_MS)
+  {
+    //Serial.println("TIMEOUT");
+  buffer[7]=1<<7;//Set Flag for failed antenna
+  }
   }
   
   //wait until ISR reports a complete tag
@@ -145,6 +187,7 @@ void loop(){
     for(uint8_t i = 0;i < 6;i++){ //first 6 bytes for tag
       buffer[i] = tagbytes[i]; 
     }
+
     buffer[6] = checkTemp(tagbytes[10],tagbytes[11]); //byte 10 for temperature, byte 11 for checkbit, return 0 if faulty temp read
     
     //reattach interrupt to watch for tag signal
@@ -164,6 +207,7 @@ void loop(){
 //must not take longer than 1ms or else millis function will start to report wrong values
 void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24MHz
   //store time when ISR started, and the last time it started 2.18uS
+  //digitalWrite(13,!digitalRead(13));
   tsnap1 = tsnap0;
   tsnap0 = micros();    //~1.25uS
   
@@ -171,6 +215,7 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24M
   //the tag header is: 0000 0000 001
   //----------------------------------------------------------------------------
   if(findstart == 1){
+    
     //----- header detect block ----- 0.96 uS
     //record the bitstream by analysing the pulse duration
     //two short pulses translate to one 0
@@ -201,6 +246,7 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24M
       if(toc == 1){
         if(bittic != 8){
           tagbytes[bytetic] = tagbytes[bytetic] << 1;
+
         }
         else{ //if the 9th bit is not a 1, control bit has failed, look for header again
           findstart = 1;
@@ -217,6 +263,7 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24M
       
       if(bittic != 8){
         tagbytes[bytetic] = (tagbytes[bytetic] << 1) | 1;
+
       }
       bittic += 1;
     }
@@ -229,6 +276,7 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24M
     //----- CRC check block ----- 26.7uS
     //reached end of transmission/array full -----------------------------------
     if(bytetic == 12){
+
       findstart = 1; //look for start again
       
       //perform CRC check on received data
@@ -252,6 +300,11 @@ void tag_watch(){ //Analyse the bitstream und check if data is a tag ~41uS @ 24M
       if(crc == 0){ //if crc of tag is ok continue
         tagfetched = 1; //multiple tags could be buffered or interrupt disabled until tag is processed
         detachInterrupt(digitalPinToInterrupt(DMOD)); //if crc checks out, disable interrupt to allow for communication
+      }
+      else{
+        #ifdef DEBUG_OUTPUT
+        Serial.println("CRC FAILED");
+        #endif
       }
     }
   }
@@ -331,11 +384,12 @@ uint32_t measureFreqCont(){
 void sendData(){ //~7uS @ 24MHz
   if(sendmode == 0){
     //buffer contains last read tag id, or all 0 if no new tag since last send
-    Wire.write(buffer,7);
+    Wire.write(buffer,8);
     
     //clear buffer after send (sends last tag that was read, no matter how long ago)
-    for(uint8_t i = 0;i < 7;i++){
+    for(uint8_t i = 0;i < 8;i++){
       buffer[i] = 0;
+      
     }
   }
   if(sendmode == 1){  //send frequency measurement
@@ -356,19 +410,29 @@ void receiveEvent(int bytes_incoming){
   if(c == 0){
     digitalWriteFast(SHD,HIGH); //high is antenna off
     digitalWriteFast(statusLED,LOW);
+    detachInterrupt(digitalPinToInterrupt(DMOD));
+    sendmode = 0;
+    isRunning=0;
   }
   if(c == 1){
     digitalWriteFast(SHD,LOW);  //low is antenna on
     digitalWriteFast(statusLED,HIGH);
+    attachInterrupt(digitalPinToInterrupt(DMOD),tag_watch, CHANGE);
+    sendmode = 0;
+    isRunning=1;
   }
-  if(c == 2) sendmode = 0; //RFID mode (tag transmit)
+  if(c == 2) 
+  {sendmode = 0; //RFID mode (tag transmit)
+  isRunning=0;}
   if(c == 3){
     sendmode = 1; //measure mode (frequency transmit)
     measure_frequency = 1;
+    isRunning=0;
   }
   if(c == 4){
     sendmode = 1; //measure mode (continous)
     measure_frequency = 2;
+    isRunning=0;
   }
 }
 
