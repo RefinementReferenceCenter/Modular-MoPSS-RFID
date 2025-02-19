@@ -56,8 +56,9 @@ uint8_t buffer[8];       //array containing a copy of the last tag that was dete
 volatile uint8_t sendmode = 0;          //which data to send on request
 volatile uint8_t measure_frequency = 0; //flag to do one frequency measurement
 
-elapsedMillis lastCLKChange=0; //How long since the clock pin flipped. Used for detecting disconnected
-bool lastCLK,nowCLK,isRunning =0;
+elapsedMillis lastCLKChange=0; //How long since the clock pin flipped. Used for detecting disconnected antenna
+bool lastCLK=1;
+bool nowCLK,isRunning =0;
 
 #define ANTENNA_WATCHDOG_TIME_MS 2000
 #ifdef DEBUG_OUTPUT
@@ -97,7 +98,7 @@ void setup(){
     s=false;
     #endif
   //to start ISR, last entry of setup
-  attachInterrupt(digitalPinToInterrupt(DMOD), tag_watch, CHANGE);
+  
   delay(100);
   digitalWrite(13,0);
   digitalWrite(SHD,0);
@@ -144,7 +145,10 @@ void loop(){
   if(isRunning == 1){ //if in "read RFID mode"
     //digitalWrite(statusLED,LOW);
   nowCLK=digitalRead(CLK);
-  if(lastCLK!=nowCLK) lastCLKChange=0;
+  if(lastCLK!=nowCLK) 
+  {lastCLKChange=0;
+  lastCLK=nowCLK;
+  }
   else if(lastCLKChange>ANTENNA_WATCHDOG_TIME_MS)
   {
     //Serial.println("TIMEOUT");

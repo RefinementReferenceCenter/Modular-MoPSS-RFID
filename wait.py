@@ -7,5 +7,9 @@ if env.IsIntegrationDump():
     Return()
 
 # Ask user name
-print("Ready For Next Module" )
-user = input()
+
+def before_upload(source, target, env):
+    print("Ready For Next Module:", (env["PIOENV"]) )
+    user = input()
+
+env.AddPreAction("upload", before_upload)
